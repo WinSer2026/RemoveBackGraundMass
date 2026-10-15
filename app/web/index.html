@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remover Fundo em Massa</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:900px;margin:14px auto;padding:0 12px;color:#222;font-size:15px}
+h1{font-size:1.3em;margin:4px 0}
+h2{font-size:1.1em;margin:18px 0 8px}
+fieldset{border:1px solid #ccc;border-radius:6px;margin:10px 0;padding:10px}
+input[type=password]{padding:5px;font-size:14px;width:320px}
+select{padding:4px;font-size:14px}
+button{padding:6px 12px;cursor:pointer;font-size:14px}
+#pick{font-size:16px;padding:12px 20px;background:#1a73e8;color:#fff;border:0;border-radius:6px}
+.muted{color:#666;font-size:13px}
+.ok{color:#0a7d2c}.err{color:#c00}
+ul{list-style:none;padding:0;margin:0}
+li{border-bottom:1px solid #eee;padding:5px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+li .n{flex:1;min-width:200px;word-break:break-all}
+</style>
+</head>
+<body>
+<h1>Remover fundo em massa</h1>
+
+<fieldset>
+  <label>Chave da API remove.bg:
+    <input type="password" id="key" placeholder="Cole aqui a sua API key">
+  </label>
+  <label style="margin-left:12px">Envios à API de cada vez:
+    <select id="conc"><option>1</option><option>2</option><option>3</option></select>
+  </label>
+  <div class="muted">Guardado no seu computador. Resultados em: <span id="outdir"></span></div>
+</fieldset>
+
+<p><button id="pick">Escolher imagens…</button>
+  <span class="muted">Qualquer formato · até 20 MB por ficheiro</span></p>
+
+<p><button id="clear">Limpar lista</button> <span id="summary" class="muted"></span></p>
+<ul id="list"></ul>
+
+<h2>Histórico</h2>
+<p>
+  <label>Dia:
+    <select id="days"></select>
+  </label>
+  <button id="openDay">Abrir pasta deste dia</button>
+  <button id="delDay">Apagar este dia</button>
+</p>
+<ul id="files"></ul>
+
+<script>
+const $ = s => document.querySelector(s);
+let api = null, lastOk = -1, booted = false;
+
+function boot() {
+  if (booted || !window.pywebview) return;
+  booted = true;
+  api = window.pywebview.api;
+  init();
+}
+window.addEventListener('pywebviewready', boot);
+boot();
+
+async function init() {
+  const c = await api.get_config();
+  $('#key').value = c.key;
+  $('#conc').value = c.conc;
+  $('#outdir').textContent = c.out;
+  await loadDays();
+  setInterval(poll, 1000);
+  poll();
+}
+
+$('#key').onchange = e => api.set_key(e.target.value);
+$('#conc').onchange = e => api.set_conc(+e.target.value);
+$('#pick').onclick = () => api.pick_files().then(poll);
+$('#clear').onclick = () => api.clear_done().then(poll);
+
+async function poll() {
+  const jobs = await api.get_jobs();
+  const list = $('#list');
+  list.innerHTML = '';
+  let ok = 0, err = 0;
+  for (const j of jobs) {
+    if (j.ok) ok++;
+    if (j.failed) err++;
+    const li = document.createElement('li');
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = j.name;
+    const s = document.createElement('span');
+    s.textContent = j.status;
+    s.className = j.ok ? 'ok' : j.failed ? 'err' : '';
+    li.append(n, s);
+    if (j.failed) {
+      const b = document.createElement('button');
+      b.textContent = 'Tentar de novo';
+      b.onclick = () => api.retry(j.id).then(poll);
+      li.append(b);
+    }
+    list.appendChild(li);
+  }
+  $('#summary').textContent = jobs.length
+    ? `${ok} de ${jobs.length} concluídas` + (err ? `, ${err} com erro` : '') : '';
+  if (ok !== lastOk) { lastOk = ok; loadDays(); }
+}
+
+async function loadDays() {
+  const days = await api.list_days();
+  const sel = $('#days');
+  const current = sel.value;
+  sel.innerHTML = '';
+  const d0 = new Date(); const todayLocal = d0.getFullYear() + '-' +
+    String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
+  if (!days.find(d => d.day === todayLocal)) days.unshift({ day: todayLocal, count: 0 });
+  for (const d of days) {
+    const o = document.createElement('option');
+    o.value = d.day;
+    o.textContent = `${d.day} (${d.count} imagem${d.count === 1 ? '' : 'ns'})`;
+    sel.appendChild(o);
+  }
+  sel.value = current && days.find(d => d.day === current) ? current : todayLocal;
+  loadFiles();
+}
+
+async function loadFiles() {
+  const day = $('#days').value;
+  const files = await api.list_files(day);
+  const ul = $('#files');
+  ul.innerHTML = '';
+  if (!files.length) {
+    const li = document.createElement('li');
+    li.className = 'muted';
+    li.textContent = 'Sem imagens neste dia.';
+    ul.appendChild(li);
+  }
+  for (const f of files) {
+    const li = document.createElement('li');
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = `${f.name}  (${f.kb} KB, ${f.time})`;
+    const b = document.createElement('button');
+    b.textContent = 'Abrir';
+    b.onclick = () => api.open_file(day, f.name);
+    li.append(n, b);
+    ul.appendChild(li);
+  }
+}
+
+$('#days').onchange = loadFiles;
+$('#openDay').onclick = () => api.open_day($('#days').value);
+$('#delDay').onclick = async () => {
+  const day = $('#days').value;
+  if (confirm(`Apagar todas as imagens do dia ${day}?`)) {
+    await api.delete_day(day);
+    loadDays();
+  }
+};
+</script>
+</body>
+</html>

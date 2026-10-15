@@ -1,18 +1,35 @@
 # RemoveBackGraundMass
 
-Aplicação web simples (um único ficheiro `index.html`, sem dependências) para remover o fundo de imagens em massa usando a API do remove.bg.
+Aplicação Windows para remover o fundo de imagens em massa, usando a API do remove.bg.
+Abre numa janela própria (não precisa de navegador).
 
-## Como usar
+## Usar (Windows)
 
-1. Abra `index.html` no navegador (duplo clique), ou sirva a pasta com `python3 -m http.server 8000` e abra `http://localhost:8000`.
-2. Cole a sua **API key** do remove.bg no campo indicado (fica guardada só no seu navegador).
-3. Arraste ou escolha várias imagens (qualquer formato, até 20 MB cada).
-4. As imagens são processadas em simultâneo (número configurável). Cada uma é descarregada automaticamente assim que fica pronta, uma a uma.
-5. Os resultados ficam guardados por dia na secção **Histórico**: escolha a data, baixe uma imagem, todas as de um dia, ou apague um dia.
+1. Descarregue `Remover Fundo.exe` (ver abaixo) e faça duplo clique.
+2. Na primeira execução é criado um atalho **Remover Fundo** no ambiente de trabalho.
+3. Cole a sua **API key** do remove.bg no topo e clique em **Escolher imagens…**.
+4. Cada imagem é processada e guardada automaticamente em `Downloads\RemoveBG\AAAA-MM-DD\`.
+5. Na secção **Histórico** escolha um dia para ver, abrir ou apagar as imagens desse dia.
+
+Formatos: qualquer imagem que o Pillow consiga ler (JPG, PNG, WEBP, GIF, BMP, TIFF, etc.), até 20 MB por ficheiro.
+
+## Obter o .exe
+
+O `.exe` é gerado automaticamente pelo GitHub Actions (workflow *Build Windows EXE*):
+- Aba **Actions** do repositório → último run → secção **Artifacts** → `Remover-Fundo-Windows`.
+- Ou correr manualmente o workflow com *Run workflow*.
+
+## Gerar localmente (Windows)
+
+Com Python 3.10+ instalado, execute `app\build_windows.bat`. O resultado fica em `app\dist\Remover Fundo.exe`.
+
+## Código
+
+- `app/app.py` – lógica (fila de envios, chamadas à API, histórico, atalho).
+- `app/web/index.html` – interface.
+- Para correr sem gerar o .exe: `cd app && pip install -r requirements.txt && python app.py`.
 
 ## Notas
 
-- Imagens em formatos que o navegador não pode ler (ex.: GIF, BMP, AVIF) são convertidas para PNG antes do envio.
-- O navegador pode pedir permissão para "descarregar vários ficheiros" na primeira vez; aceite para o descarregamento automático funcionar.
-- Os resultados são guardados no IndexedDB do navegador. Limpar os dados do navegador apaga o histórico.
-- A chave da API fica visível para quem usar este navegador; use-a apenas no seu computador.
+- A chave da API fica guardada em `%APPDATA%\RemoveBG\config.json`.
+- Por omissão é enviada uma imagem de cada vez à API (evita limites de pedidos). Pode mudar na caixa "Envios à API de cada vez".
