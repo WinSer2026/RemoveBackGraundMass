@@ -38,9 +38,9 @@ td,th{border-bottom:1px solid #eee;padding:6px;text-align:left}
 <input type="file" id="file" multiple hidden>
 
 <p>
-  <label>Processamentos em simultâneo:
+  <label>Envios à API de cada vez:
     <select id="conc">
-      <option>2</option><option selected>4</option><option>6</option><option>10</option>
+      <option selected>1</option><option>2</option><option>3</option>
     </select>
   </label>
   <button id="clear">Limpar lista</button>
@@ -102,7 +102,7 @@ function dbTx(mode, fn) {
 /* ---------- chave da API ---------- */
 $('#key').value = localStorage.getItem('rbg_key') || '';
 $('#key').onchange = e => localStorage.setItem('rbg_key', e.target.value.trim());
-$('#conc').value = localStorage.getItem('rbg_conc') || '4';
+$('#conc').value = localStorage.getItem('rbg_conc') || '1';
 $('#conc').onchange = e => { localStorage.setItem('rbg_conc', e.target.value); pump(); };
 
 /* ---------- download automático em fila ---------- */
@@ -169,7 +169,7 @@ function render(job) {
   if (job.failed) {
     const b = document.createElement('button');
     b.textContent = 'Tentar de novo';
-    b.onclick = () => { job.failed = false; job.status = 'Na fila'; pending.push(job); render(job); pump(); };
+    b.onclick = () => { job.failed = false; job.status = 'A processar…'; pending.push(job); render(job); pump(); };
     job.el.append(b);
   }
 }
@@ -213,7 +213,7 @@ function updSummary() {
 
 function addFiles(files) {
   for (const f of files) {
-    const job = { file: f, name: f.name, status: 'Na fila', ok: false, failed: false };
+    const job = { file: f, name: f.name, status: 'A processar…', ok: false, failed: false };
     jobs.push(job);
     if (f.size > MAX) {
       job.status = 'Erro: maior que 20 MB';
