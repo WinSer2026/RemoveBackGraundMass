@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remover Fundo em Massa</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:860px;margin:16px auto;padding:0 12px;color:#222;font-size:15px}
+h1{font-size:1.3em;margin:4px 0}
+h2{font-size:1.1em;margin:20px 0 8px}
+fieldset{border:1px solid #ccc;border-radius:6px;margin:10px 0;padding:10px}
+#drop{border:2px dashed #888;border-radius:8px;padding:24px;text-align:center;cursor:pointer}
+#drop.over{background:#eef}
+input[type=password],input[type=date]{padding:5px;font-size:14px}
+button{padding:5px 10px;cursor:pointer;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{border-bottom:1px solid #eee;padding:6px;text-align:left}
+.ok{color:#0a7d2c}.err{color:#c00}.muted{color:#666;font-size:13px}
+#list{list-style:none;padding:0;margin:0}
+#list li{border-bottom:1px solid #eee;padding:5px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#list .n{flex:1;min-width:180px;word-break:break-all}
+</style>
+</head>
+<body>
+<h1>Remover fundo em massa</h1>
+<p class="muted">As imagens são processadas diretamente no seu navegador e enviadas à API remove.bg. Cada imagem é descarregada automaticamente assim que fica pronta. Os resultados ficam guardados neste navegador por dia.</p>
+
+<fieldset>
+  <label>Chave da API remove.bg:
+    <input type="password" id="key" size="40" placeholder="Cole aqui a sua API key">
+  </label>
+  <span class="muted">(guardada só neste navegador)</span>
+</fieldset>
+
+<div id="drop">Arraste imagens para aqui ou clique para escolher<br>
+  <span class="muted">Qualquer formato de imagem · até 20 MB por ficheiro</span>
+</div>
+<input type="file" id="file" multiple hidden>
+
+<p>
+  <label>Processamentos em simultâneo:
+    <select id="conc">
+      <option>2</option><option selected>4</option><option>6</option><option>10</option>
+    </select>
+  </label>
+  <button id="clear">Limpar lista</button>
+  <span id="summary" class="muted"></span>
+</p>
+<ul id="list"></ul>
+
+<h2>Histórico</h2>
+<p>
+  <input type="date" id="day">
+  <button id="dlAll">Baixar todas deste dia</button>
+  <button id="delDay">Apagar este dia</button>
+  <span id="histCount" class="muted"></span>
+</p>
+<table><tbody id="hist"></tbody></table>
+
+<script>
+const $ = s => document.querySelector(s);
+const MAX = 20 * 1024 * 1024;
+const API = 'https://api.remove.bg/v1.0/removebg';
+const NATIVE = ['image/jpeg', 'image/png', 'image/webp'];
+
+/* ---------- utilidades ---------- */
+const pad = n => String(n).padStart(2, '0');
+const dayKey = (d = new Date()) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const baseName = n => n.replace(/\.[^.]+$/, '');
+function saveBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+
+/* ---------- base de dados (IndexedDB) ---------- */
+let db;
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('removebg', 1);
+    r.onupgradeneeded = () => {
+      const s = r.result.createObjectStore('results', { keyPath: 'id', autoIncrement: true });
+      s.createIndex('day', 'day');
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function dbTx(mode, fn) {
+  return new Promise((res, rej) => {
+    const t = db.transaction('results', mode);
+    const req = fn(t.objectStore('results'));
+    t.oncomplete = () => res(req.result);
+    t.onerror = () => rej(t.error);
+  });
+}
+
+/* ---------- chave da API ---------- */
+$('#key').value = localStorage.getItem('rbg_key') || '';
+$('#key').onchange = e => localStorage.setItem('rbg_key', e.target.value.trim());
+$('#conc').value = localStorage.getItem('rbg_conc') || '4';
+$('#conc').onchange = e => { localStorage.setItem('rbg_conc', e.target.value); pump(); };
+
+/* ---------- download automático em fila ---------- */
+const dlQueue = [];
+let dlBusy = false;
+function autoDownload(blob, name) {
+  dlQueue.push({ blob, name });
+  if (!dlBusy) drainDl();
+}
+async function drainDl() {
+  dlBusy = true;
+  while (dlQueue.length) {
+    const { blob, name } = dlQueue.shift();
+    saveBlob(blob, name);
+    await new Promise(r => setTimeout(r, 500)); // pausa para o navegador não bloquear downloads
+  }
+  dlBusy = false;
+}
+
+/* ---------- conversão para formato aceite pela API ---------- */
+async function toSupported(file) {
+  if (NATIVE.includes(file.type)) return file;
+  try {
+    // formatos que o navegador consegue ler (GIF, BMP, AVIF, etc.) são convertidos para PNG
+    const bmp = await createImageBitmap(file);
+    const c = document.createElement('canvas');
+    c.width = bmp.width; c.height = bmp.height;
+    c.getContext('2d').drawImage(bmp, 0, 0);
+    const png = await new Promise(r => c.toBlob(r, 'image/png'));
+    bmp.close && bmp.close();
+    return new File([png], baseName(file.name) + '.png', { type: 'image/png' });
+  } catch {
+    return file; // deixa a API decidir
+  }
+}
+
+/* ---------- fila de processamento ---------- */
+const jobs = [];
+const pending = [];
+let active = 0;
+
+function pump() {
+  const max = +$('#conc').value;
+  while (active < max && pending.length) {
+    const job = pending.shift();
+    active++;
+    run(job).finally(() => { active--; pump(); updSummary(); });
+  }
+}
+
+function render(job) {
+  if (!job.el) {
+    job.el = document.createElement('li');
+    $('#list').appendChild(job.el);
+  }
+  job.el.innerHTML = '';
+  const n = document.createElement('span');
+  n.className = 'n';
+  n.textContent = job.name;
+  const s = document.createElement('span');
+  s.textContent = job.status;
+  s.className = job.ok ? 'ok' : job.failed ? 'err' : '';
+  job.el.append(n, s);
+  if (job.failed) {
+    const b = document.createElement('button');
+    b.textContent = 'Tentar de novo';
+    b.onclick = () => { job.failed = false; job.status = 'Na fila'; pending.push(job); render(job); pump(); };
+    job.el.append(b);
+  }
+}
+
+async function run(job) {
+  job.status = 'A processar…';
+  render(job);
+  try {
+    const input = await toSupported(job.file);
+    const fd = new FormData();
+    fd.append('size', 'auto');
+    fd.append('image_file', input, input.name);
+    const key = $('#key').value.trim();
+    if (!key) throw new Error('falta a chave da API');
+    const r = await fetch(API, { method: 'POST', headers: { 'X-Api-Key': key }, body: fd });
+    if (!r.ok) {
+      let msg = 'erro ' + r.status;
+      try { msg = (await r.json()).errors[0].title; } catch {}
+      throw new Error(msg);
+    }
+    const blob = await r.blob();
+    const outName = baseName(job.name) + '_sem_fundo.png';
+    await dbTx('readwrite', s => s.add({ day: dayKey(), name: outName, blob, time: Date.now() }));
+    job.status = 'Pronto e descarregado';
+    job.ok = true;
+    render(job);
+    autoDownload(blob, outName);
+    if ($('#day').value === dayKey()) loadDay();
+  } catch (e) {
+    job.status = 'Erro: ' + e.message;
+    job.failed = true;
+    render(job);
+  }
+}
+
+function updSummary() {
+  const done = jobs.filter(j => j.ok).length;
+  const err = jobs.filter(j => j.failed).length;
+  $('#summary').textContent = jobs.length ? `${done} de ${jobs.length} concluídas` + (err ? `, ${err} com erro` : '') : '';
+}
+
+function addFiles(files) {
+  for (const f of files) {
+    const job = { file: f, name: f.name, status: 'Na fila', ok: false, failed: false };
+    jobs.push(job);
+    if (f.size > MAX) {
+      job.status = 'Erro: maior que 20 MB';
+      job.failed = true;
+      render(job);
+    } else {
+      render(job);
+      pending.push(job);
+    }
+  }
+  pump();
+  updSummary();
+}
+
+/* ---------- eventos da zona de envio ---------- */
+const drop = $('#drop');
+drop.onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => {
+  e.preventDefault();
+  drop.classList.remove('over');
+  addFiles([...e.dataTransfer.files]);
+};
+$('#clear').onclick = () => {
+  // remove só as que já terminaram (sucesso ou erro); as em curso ou na fila ficam
+  for (let i = jobs.length - 1; i >= 0; i--) {
+    const j = jobs[i];
+    if (j.ok || j.failed) { j.el && j.el.remove(); jobs.splice(i, 1); }
+  }
+  updSummary();
+};
+
+/* ---------- histórico ---------- */
+let dayRecords = [];
+async function loadDay() {
+  const day = $('#day').value;
+  dayRecords = (await dbTx('readonly', s => s.index('day').getAll(day))) || [];
+  dayRecords.sort((a, b) => a.time - b.time);
+  const t = $('#hist');
+  t.innerHTML = '';
+  for (const rec of dayRecords) {
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td');
+    td1.textContent = rec.name;
+    const td2 = document.createElement('td');
+    td2.textContent = new Date(rec.time).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+    const td3 = document.createElement('td');
+    const bd = document.createElement('button');
+    bd.textContent = 'Baixar';
+    bd.onclick = () => saveBlob(rec.blob, rec.name);
+    const bx = document.createElement('button');
+    bx.textContent = 'Apagar';
+    bx.onclick = async () => { await dbTx('readwrite', s => s.delete(rec.id)); loadDay(); };
+    td3.append(bd, ' ', bx);
+    tr.append(td1, td2, td3);
+    t.appendChild(tr);
+  }
+  $('#histCount').textContent = dayRecords.length ? `${dayRecords.length} imagem(ns) neste dia` : 'Sem imagens neste dia';
+}
+$('#day').value = dayKey();
+$('#day').onchange = loadDay;
+$('#dlAll').onclick = () => dayRecords.forEach((rec, i) => setTimeout(() => saveBlob(rec.blob, rec.name), i * 500));
+$('#delDay').onclick = async () => {
+  if (!dayRecords.length || !confirm('Apagar todas as imagens deste dia?')) return;
+  for (const rec of dayRecords) await dbTx('readwrite', s => s.delete(rec.id));
+  loadDay();
+};
+
+openDB().then(d => { db = d; loadDay(); });
+</script>
+</body>
+</html>
