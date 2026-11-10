@@ -33,3 +33,16 @@ Com Python 3.10+ instalado, execute `app\build_windows.bat`. O resultado fica em
 
 - A chave da API fica guardada em `%APPDATA%\RemoveBG\config.json`.
 - Por omissão é enviada uma imagem de cada vez à API (evita limites de pedidos). Pode mudar na caixa "Envios à API de cada vez".
+
+## Quiz de Defesa (projecto de pesquisa)
+
+Pasta [`quiz/`](quiz/) — aplicação web autónoma (abre `quiz/index.html`, sem instalação) para
+treinar a defesa do projecto de pesquisa «A política de expansão do ensino básico de 7 para 9
+classes em Moçambique» (Carlota Roberto Monjane, UP-Maputo, 2026).
+
+- 5 níveis de dificuldade, 448 perguntas com resposta e fonte (capítulo/página) no trabalho;
+- 10 segundos por pergunta, resposta visível 5 segundos e avanço automático;
+- banco rotativo sem repetições, com ordem não sequencial por tema;
+- modo «simulação de banca» e revisão de erros.
+
+Detalhes em [`quiz/README.md`](quiz/README.md).
