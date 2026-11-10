@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-MZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz de Defesa · Carlota Monjane</title>
+<meta name="description" content="Quiz de preparação para a defesa do projecto de pesquisa «A política de expansão do ensino básico de 7 para 9 classes em Moçambique», de Carlota Roberto Monjane (UP-Maputo, 2026).">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b2233'/%3E%3Cpath d='M18 40h28M18 32h28M18 24h28' stroke='%23d8a72b' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='46' r='7' fill='%232f7d5a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<a class="salto" href="#vista">Saltar para o conteúdo</a>
+
+<div class="app">
+  <header class="topbar">
+    <button class="marca" id="irInicio" title="Voltar ao início">
+      <span class="marca-selo" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="34" height="34">
+          <path d="M8 14h32M8 22h32M8 30h20" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="35" cy="34" r="6" fill="none" stroke="currentColor" stroke-width="3"/>
+          <path d="M39.5 38.5 44 43" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="marca-texto">
+        <strong>Quiz de Defesa</strong>
+        <small>Expansão do ensino básico de 7 para 9 classes</small>
+      </span>
+    </button>
+
+    <nav class="accoes-topo" aria-label="Navegação principal">
+      <button class="btn btn-fantasma" data-nav="inicio">Níveis</button>
+      <button class="btn btn-fantasma" data-nav="defesa">Modo defesa</button>
+      <button class="btn btn-fantasma" data-nav="revisao">Revisão</button>
+      <button class="btn btn-fantasma" data-nav="progresso">Progresso</button>
+      <button class="btn btn-icone" id="btnSom" title="Ligar/desligar som" aria-pressed="true">
+        <span aria-hidden="true" id="iconeSom">🔊</span><span class="sr">Som</span>
+      </button>
+    </nav>
+  </header>
+
+  <main id="vista" class="vista" tabindex="-1"></main>
+
+  <footer class="rodape">
+    <p>Perguntas e respostas ancoradas no projecto de pesquisa de <strong>Carlota Roberto Monjane</strong> — UP-Maputo, Faculdade de Educação e Psicologia, 2026.</p>
+    <p class="rodape-min">10 segundos para responder · resposta visível 5 segundos · banco rotativo sem repetição</p>
+  </footer>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<dialog id="dialogoAjuda" class="dialogo">
+  <h2>Como funciona</h2>
+  <ul class="lista-ajuda">
+    <li><strong>10 segundos</strong> para responder a cada pergunta. O anel à volta do número é o tempo que resta.</li>
+    <li>Esgotado o tempo — ou depois de responderes — a <strong>resposta correcta fica visível 5 segundos</strong> e o quiz avança sozinho.</li>
+    <li>Há perguntas de <strong>escolha múltipla</strong> e perguntas <strong>abertas</strong>: nestas últimas, responde em voz alta como se estivesses perante o júri e carrega em «Revelar».</li>
+    <li>O banco é <strong>rotativo</strong>: dentro de cada nível, nenhuma pergunta se repete até todo o banco ter sido usado. Depois, a rotação recomeça baralhada.</li>
+    <li>A ordem <strong>não segue os capítulos</strong>: os temas aparecem misturados, para treinares a transição rápida que a defesa exige.</li>
+    <li>Atalhos: <kbd>1</kbd>–<kbd>5</kbd> escolhem opção · <kbd>Enter</kbd>/<kbd>Espaço</kbd> revelam · <kbd>→</kbd> avança · <kbd>P</kbd> pausa · <kbd>Esc</kbd> pausa.</li>
+  </ul>
+  <p class="dialogo-fonte">Fonte: Projecto de Pesquisa, Carlota Roberto Monjane, UP-Maputo, 2026. As referências de página indicadas em cada resposta remetem para a paginação impressa do documento.</p>
+  <form method="dialog"><button class="btn btn-primario">Entendido</button></form>
+</dialog>
+
+<script src="js/dados-base.js"></script>
+<script src="js/dados-n1.js"></script>
+<script src="js/dados-n2.js"></script>
+<script src="js/dados-n3.js"></script>
+<script src="js/dados-n4.js"></script>
+<script src="js/dados-n5.js"></script>
+<script src="js/dados-extra.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
